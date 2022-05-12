@@ -22,18 +22,12 @@ public class AccountServiceImpl extends AbstractServiceImpl implements AccountSe
         Profile profile = new Profile();
         profile.setProfileId(profileId);
         profile.setUsername(username);
-//        account.getProfiles().add(profile);
 
         List<Profile> profiles = account.getProfiles();
         if (profiles == null)
             profiles = new ArrayList<>();
-//          profiles.add(new Profile(profileId, username));
         profiles.add(profile);
         account.setProfiles(profiles);
-
-        //        profile.getProfileId();
-//        account.getProfiles().add(new Profile(profileId, username));
-//        account.add(new Profile(profileId, username));
     }
 
     @Override

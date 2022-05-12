@@ -1,5 +1,9 @@
 package com.acmeflix.service;
 
+import com.acmeflix.domain.Watch;
+
 public interface WatchService {
-    void watch(short accountId, short)
+    void watch(Watch watch);
+
+    void getWatches();
 }

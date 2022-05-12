@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
@@ -42,6 +43,8 @@ public class AcmeFlix {
     private final AccountService accountService = new AccountServiceImpl();
     private final MovieService movieService = new MovieServiceImpl();
     private final SeriesService seriesService = new SeriesServiceImpl();
+    private final WatchService watchService = new WatchServiceImpl();
+    private final ReportService reportService = new ReportServiceImpl();
 
     public static void main(String[] args) {
         // Start database server
@@ -53,8 +56,8 @@ public class AcmeFlix {
 
         acmeFlix.createTables();
         acmeFlix.insertData();
-        acmeFlix.displayData();
-        //acmeFlix.generateReports();
+        acmeFlix.displayData();  // Απλώς για να δούμε το περιεχόμενο των πινάκων
+        acmeFlix.generateReports();
 
         stopH2Server();
     }
@@ -67,7 +70,8 @@ public class AcmeFlix {
                     sqlCommands.getProperty("create.profileTable"),
                     sqlCommands.getProperty("create.programTable"),
                     sqlCommands.getProperty("create.speakingLanguageTable"),
-                    sqlCommands.getProperty("create.subtitleLanguageTable")
+                    sqlCommands.getProperty("create.subtitleLanguageTable"),
+                    sqlCommands.getProperty("create.watchTable")
             );
             //@formatter:on
         } catch (SQLException ex) {
@@ -79,7 +83,7 @@ public class AcmeFlix {
     private void insertData() {
         try (Connection connection = DataSource.getConnection(); Statement statement = connection.createStatement()) {
 
-            // Insert accounts
+            // Insert Accounts
             Account account = accountService.initiateAccount("Charitonidis", SubscriptionPlan.BASIC);
             accountService.addProfile(account, (short) 1, "Kosmas");
             accountService.addProfile(account, (short) 2, "Litsa");
@@ -175,7 +179,24 @@ public class AcmeFlix {
 
             seriesService.checkout(series);
 
-            logger.info("Eftase edw");
+            // Insert watching
+            Watch watch = new Watch();
+            watch.setAccountId(1);
+            watch.setProfileId((short) 2);
+            watch.setProgramId(1);
+            watch.setSeasonId((short) 0);
+            watch.setEpisodeId((short) 0);
+            watch.setWatchDate(Date.valueOf("2021-12-05"));
+            watchService.watch(watch);
+
+            watch.setAccountId(2);
+            watch.setProfileId((short) 3);
+            watch.setProgramId(3);
+            watch.setSeasonId((short) 2);
+            watch.setEpisodeId((short) 1);
+            watch.setWatchDate(Date.valueOf("2022-02-17"));
+            watchService.watch(watch);
+
         } catch (SQLException ex) {
             logger.error("Error while inserting data.", ex);
         }
@@ -186,12 +207,26 @@ public class AcmeFlix {
         accountService.getProfiles();
         movieService.getPrograms();
         movieService.getLanguages();
+        watchService.getWatches();
     }
 
     private void runCommands(Statement statement, String... commands) throws SQLException {
         for (String command : commands) {
             logger.info("Command was successful with {} row(s) affected.", statement.executeUpdate(command));
         }
+    }
+
+    private void generateReports() {
+        // Report 1: List of the programs viewed by a specific account and its connected profiles
+        reportService.report1(1);
+        reportService.report1(2);
+
+        // Report 2: Account's popular content categories
+        reportService.report2(1);
+        reportService.report2(2);
+
+        // Report 3: List of the 5 most viewed programs, TV shows and movies
+        reportService.report3();
     }
 
     private static void startH2Server() {

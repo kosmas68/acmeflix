@@ -7,25 +7,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.*;
+import java.text.DateFormat;
 
 public class DataRepositoryServiceImpl implements DataRepositoryService {
     private static final Logger logger = LoggerFactory.getLogger(DataRepositoryService.class);
 
     @Override
     public boolean save(Account account) {
-        logger.info("000");
         try (Connection connection = DataSource.getConnection();
              PreparedStatement preparedStatement = connection.prepareStatement(
                      AcmeFlix.sqlCommands.getProperty("insert.account.000"), Statement.RETURN_GENERATED_KEYS)) {
 
-            logger.info("111000111");
-            //preparedStatement.setInt(1, 0);
-            logger.info("222");
             preparedStatement.setString(1, account.getName());
-            logger.info("333");
             preparedStatement.setInt(2, account.getSubscriptionPlan().getPlan());
 
-            logger.info("Amesws prin to insert gia {} kai {}", account.getName(), account.getSubscriptionPlan().getPlan());
             int rowsAffected = preparedStatement.executeUpdate();
             logger.info("Successful insert of account {}", account);
 
@@ -68,7 +63,7 @@ public class DataRepositoryServiceImpl implements DataRepositoryService {
              ResultSet resultSet = statement.executeQuery(
                      AcmeFlix.sqlCommands.getProperty("select.accounts.001"))) {
 
-            logger.info("---------------------------------------------------------------------");
+            logger.info("-------------- Accounts ---------------------------------------------");
             //@formatter:off
             int rowCount = 1;
             while (resultSet.next()) {
@@ -92,7 +87,7 @@ public class DataRepositoryServiceImpl implements DataRepositoryService {
              ResultSet resultSet = statement.executeQuery(
                      AcmeFlix.sqlCommands.getProperty("select.profiles.001"))) {
 
-            logger.info("---------------------------------------------------------------------");
+            logger.info("-------------- Profiles ---------------------------------------------");
             //@formatter:off
             int rowCount = 1;
             while (resultSet.next()) {
@@ -111,15 +106,11 @@ public class DataRepositoryServiceImpl implements DataRepositoryService {
 
     @Override
     public boolean save(Movie movie) {
-        logger.info("000");
         try (Connection connection = DataSource.getConnection();
              PreparedStatement preparedStatement = connection.prepareStatement(
                      AcmeFlix.sqlCommands.getProperty("insert.program.000"), Statement.RETURN_GENERATED_KEYS)) {
 
-            logger.info("111");
-            logger.info("222");
             preparedStatement.setString(1, movie.getTitle());
-            logger.info("333");
             preparedStatement.setInt(2, movie.getProgramType().getType());
             preparedStatement.setInt(3, movie.getProgramCategory().getCategory());
 
@@ -151,10 +142,7 @@ public class DataRepositoryServiceImpl implements DataRepositoryService {
              PreparedStatement preparedStatement = connection.prepareStatement(
                      AcmeFlix.sqlCommands.getProperty("insert.program.000"), Statement.RETURN_GENERATED_KEYS)) {
 
-            logger.info("111");
-            logger.info("222");
             preparedStatement.setString(1, series.getTitle());
-            logger.info("333");
             preparedStatement.setInt(2, series.getProgramType().getType());
             preparedStatement.setInt(3, series.getProgramCategory().getCategory());
 
@@ -180,6 +168,143 @@ public class DataRepositoryServiceImpl implements DataRepositoryService {
         } catch (SQLException ex) {
             logger.info("Error while inserting series {}", series);
             return false;
+        }
+
+    }
+
+    @Override
+    public void save(Watch watch) {
+        try (Connection connection = DataSource.getConnection();
+             PreparedStatement preparedStatement = connection.prepareStatement(
+                     AcmeFlix.sqlCommands.getProperty("insert.watch.000"), Statement.RETURN_GENERATED_KEYS)) {
+
+
+            preparedStatement.setInt(1, watch.getAccountId());
+            preparedStatement.setShort(2, watch.getProfileId());
+            preparedStatement.setInt(3, watch.getProgramId());
+            preparedStatement.setShort(4, watch.getSeasonId());
+            preparedStatement.setShort(5, watch.getEpisodeId());
+            preparedStatement.setDate(6, (Date) watch.getWatchDate());
+
+            int rowsAffected = preparedStatement.executeUpdate();
+            logger.info("Successful insert of watch {}", watch);
+        } catch (SQLException ex) {
+            logger.info("Error while inserting watch {}", watch);
+        }
+    }
+
+    @Override
+    public void getWatches() {
+        try (Connection connection = DataSource.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(
+                     AcmeFlix.sqlCommands.getProperty("select.watch.001"))) {
+
+            logger.info("-------------- Watch ------------------------------------------------");
+            //@formatter:off
+            int rowCount = 1;
+            while (resultSet.next()) {
+                logger.info("{}. {}:{}, {}:{}, {}:{}, {}:{}, {}:{}, {}:{}", rowCount++,
+                        resultSet.getMetaData().getColumnName(1), resultSet.getString(1),
+                        resultSet.getMetaData().getColumnName(2), resultSet.getString(2),
+                        resultSet.getMetaData().getColumnName(3), resultSet.getString(3),
+                        resultSet.getMetaData().getColumnName(4), resultSet.getString(4),
+                        resultSet.getMetaData().getColumnName(5), resultSet.getString(5),
+                        resultSet.getMetaData().getColumnName(6), resultSet.getString(6));
+            }
+            //@formatter:on
+            logger.info("---------------------------------------------------------------------");
+
+        } catch (SQLException ex) {
+            logger.info("Error while retrieving watches");
+        }
+    }
+
+    @Override
+    public void report1(int accountId) {
+        // List of the programs viewed by a specific account and its connected profiles
+        String mySelect =
+                "SELECT profile.username, program.title, watch.seasonId, watch.episodeId, watch.watchDate " +
+                        "FROM watch, profile, program " +
+                        "WHERE watch.accountId = " + accountId +
+                        "  AND profile.accountId = watch.accountId " +
+                        "  AND profile.profileId = watch.profileId " +
+                        "  AND program.id = watch.programId;";
+
+        try (Connection connection = DataSource.getConnection();
+             Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,
+                     ResultSet.CONCUR_READ_ONLY);
+             ResultSet resultSet = statement.executeQuery(mySelect)) {
+            logger.info("----- report 1 for account {} ---------------------------------------", accountId);
+            while (resultSet.next()) {
+                logger.info("{} {} {} {} {}", resultSet.getString(1), resultSet.getString(2),
+                        resultSet.getShort(3), resultSet.getShort(4),
+                        DateFormat.getDateInstance().format(resultSet.getDate(5)));
+            }
+            logger.info("---------------------------------------------------------------------");
+
+        } catch (SQLException ex) {
+            logger.error("Error while reading data for report 1", ex);
+        }
+
+    }
+
+    @Override
+    public void report2(int accountId) {
+        //Account's popular content categories
+        // Σχόλιο: Όπως είναι τώρα φέρνει όλες τις κατηγορίες που έχει δει ο accountId. Για να φέρνει μόνο τις πιο
+        //         δημοφιλείς θα πρέπει είτε να μπει ένας μετρητής (όπως ακριβώς στο report 3 παρακάτω), είτε να μπει
+        //         στο query ένα HAVING COUNT > κάποιο όριο. Επειδή δεν ξέρω ποιο απ' τα δύο προτιμάμε, το αφήνω έτσι.
+        //         Άλλωστε φέρνει πρώτες τις πιο δημοφιλείς.
+        String mySelect =
+                "SELECT program.category, COUNT(DISTINCT program.Id) " +
+                        "FROM watch, program " +
+                        "WHERE watch.accountId = " + accountId +
+                        "  AND program.id = watch.programId " +
+                        "GROUP BY program.category " +
+                        "ORDER BY 2 DESC;";
+
+        try (Connection connection = DataSource.getConnection();
+             Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,
+                     ResultSet.CONCUR_READ_ONLY);
+             ResultSet resultSet = statement.executeQuery(mySelect)) {
+            logger.info("----- report 2 for account {} ---------------------------------------", accountId);
+            while (resultSet.next()) {
+                logger.info("{} {}", resultSet.getShort(1), resultSet.getInt(2));
+            }
+            logger.info("---------------------------------------------------------------------");
+
+        } catch (SQLException ex) {
+            logger.error("Error while reading data for report 2", ex);
+        }
+
+    }
+
+    @Override
+    public void report3() {
+        //List of the 5 most viewed programs, TV shows and movies
+        String mySelect =
+                "SELECT program.id, program.title, program.type, COUNT(DISTINCT (watch.accountId, watch.profileId)) " +
+                        "FROM watch, program " +
+                        "WHERE program.id = watch.programId " +
+                        "GROUP BY program.id, program.title, program.type " +
+                        "ORDER BY 4 DESC;";
+
+        try (Connection connection = DataSource.getConnection();
+             Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,
+                     ResultSet.CONCUR_READ_ONLY);
+             ResultSet resultSet = statement.executeQuery(mySelect)) {
+            logger.info("----- report 3 ------------------------------------------------------");
+            short count = 0;
+            while (resultSet.next() && count < 5) {
+                logger.info("{} {} {} {}", resultSet.getInt(1), resultSet.getString(2),
+                        resultSet.getShort(3), resultSet.getInt(4));
+                count++;
+            }
+            logger.info("---------------------------------------------------------------------");
+
+        } catch (SQLException ex) {
+            logger.error("Error while reading data for report 1", ex);
         }
 
     }
@@ -226,7 +351,7 @@ public class DataRepositoryServiceImpl implements DataRepositoryService {
              ResultSet resultSet = statement.executeQuery(
                      AcmeFlix.sqlCommands.getProperty("select.programs.001"))) {
 
-            logger.info("---------------------------------------------------------------------");
+            logger.info("-------------- Programs ---------------------------------------------");
             //@formatter:off
             int rowCount = 1;
             while (resultSet.next()) {
@@ -251,7 +376,7 @@ public class DataRepositoryServiceImpl implements DataRepositoryService {
              ResultSet resultSet = statement.executeQuery(
                      AcmeFlix.sqlCommands.getProperty("select.speakingLanguage.001"))) {
 
-            logger.info("---------------------------------------------------------------------");
+            logger.info("-------------- Speaking Languages -----------------------------------");
             //@formatter:off
             int rowCount = 1;
             while (resultSet.next()) {
@@ -273,7 +398,7 @@ public class DataRepositoryServiceImpl implements DataRepositoryService {
              ResultSet resultSet = statement.executeQuery(
                      AcmeFlix.sqlCommands.getProperty("select.subtitleLanguage.001"))) {
 
-            logger.info("---------------------------------------------------------------------");
+            logger.info("-------------- Subtitle Languages -----------------------------------");
             //@formatter:off
             int rowCount = 1;
             while (resultSet.next()) {
